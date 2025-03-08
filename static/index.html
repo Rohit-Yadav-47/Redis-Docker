@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Item Manager</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f9f9f9;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button.delete {
+            background-color: #f44336;
+        }
+        button.delete:hover {
+            background-color: #d32f2f;
+        }
+        .item {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: white;
+        }
+        .item h3 {
+            margin-top: 0;
+        }
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 2s linear infinite;
+            margin: 20px auto;
+            display: none;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        #status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: #f1f1f1;
+            margin-right: 5px;
+            border-radius: 5px 5px 0 0;
+        }
+        .tab.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>Item Manager</h1>
+    <div id="status"></div>
+    
+    <div class="tabs">
+        <div class="tab active" data-tab="items">Items</div>
+        <div class="tab" data-tab="create">Create Item</div>
+        <div class="tab" data-tab="redis">Redis Info</div>
+    </div>
+    
+    <div id="items" class="tab-content active">
+        <h2>Item List</h2>
+        <div class="loader" id="itemsLoader"></div>
+        <div id="itemsList"></div>
+    </div>
+    
+    <div id="create" class="tab-content">
+        <h2>Create New Item</h2>
+        <div class="card">
+            <form id="itemForm">
+                <div class="form-group">
+                    <label for="name">Name:</label>
+                    <input type="text" id="name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="description">Description:</label>
+                    <textarea id="description" name="description" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="price">Price:</label>
+                    <input type="number" id="price" name="price" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="is_active" name="is_active" checked> Active
+                    </label>
+                </div>
+                <button type="submit">Create Item</button>
+            </form>
+        </div>
+    </div>
+    
+    <div id="redis" class="tab-content">
+        <h2>Redis Information</h2>
+        <div class="loader" id="redisLoader"></div>
+        <div class="card">
+            <h3>Redis Stats</h3>
+            <div id="redisStats"></div>
+        </div>
+        <div class="card">
+            <h3>Redis Keys</h3>
+            <div id="redisKeys"></div>
+        </div>
+        <div class="card">
+            <h3>Random Number Generator</h3>
+            <button id="randomBtn">Generate Random Number</button>
+            <p id="randomResult"></p>
+        </div>
+    </div>
+    
+    <!-- Edit Item Modal (simple implementation) -->
+    <div id="editItemForm" style="display: none;" class="card">
+        <h3>Edit Item</h3>
+        <form id="editForm">
+            <input type="hidden" id="edit_id">
+            <div class="form-group">
+                <label for="edit_name">Name:</label>
+                <input type="text" id="edit_name" name="edit_name" required>
+            </div>
+            <div class="form-group">
+                <label for="edit_description">Description:</label>
+                <textarea id="edit_description" name="edit_description" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="edit_price">Price:</label>
+                <input type="number" id="edit_price" name="edit_price" step="0.01" required>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="edit_is_active" name="edit_is_active"> Active
+                </label>
+            </div>
+            <button type="button" id="updateItemBtn">Update Item</button>
+            <button type="button" onclick="document.getElementById('editItemForm').style.display='none';">Cancel</button>
+        </form>
+    </div>
+
+    <script>
+        // API Base URL - change if needed
+        const apiBaseUrl = '';
+        
+        // DOM Elements
+        const itemsList = document.getElementById('itemsList');
+        const itemsLoader = document.getElementById('itemsLoader');
+        const redisLoader = document.getElementById('redisLoader');
+        const redisStats = document.getElementById('redisStats');
+        const redisKeys = document.getElementById('redisKeys');
+        const randomResult = document.getElementById('randomResult');
+        const statusDiv = document.getElementById('status');
+        const itemForm = document.getElementById('itemForm');
+        const editForm = document.getElementById('editForm');
+        const editItemForm = document.getElementById('editItemForm');
+        const updateItemBtn = document.getElementById('updateItemBtn');
+        const randomBtn = document.getElementById('randomBtn');
+        const tabs = document.querySelectorAll('.tab');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        // Tab Navigation
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabId = tab.getAttribute('data-tab');
+                tabs.forEach(t => t.classList.remove('active'));
+                tabContents.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(tabId).classList.add('active');
+                
+                if (tabId === 'items') {
+                    fetchItems();
+                } else if (tabId === 'redis') {
+                    fetchRedisInfo();
+                }
+            });
+        });
+
+        // Show status message
+        function showStatus(message, isError = false) {
+            statusDiv.textContent = message;
+            statusDiv.style.display = 'block';
+            if (isError) {
+                statusDiv.className = 'error';
+            } else {
+                statusDiv.className = 'success';
+            }
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // Fetch and display items
+        async function fetchItems() {
+            itemsLoader.style.display = 'block';
+            itemsList.innerHTML = '';
+            
+            try {
+                const response = await fetch(`${apiBaseUrl}/items/`);
+                const items = await response.json();
+                
+                if (items.length === 0) {
+                    itemsList.innerHTML = '<p>No items found</p>';
+                } else {
+                    items.forEach(item => {
+                        const itemDiv = document.createElement('div');
+                        itemDiv.className = 'item';
+                        itemDiv.innerHTML = `
+                            <h3>${item.name} ${item.is_active ? '' : '(Inactive)'}</h3>
+                            <p>${item.description || 'No description'}</p>
+                            <p><strong>Price:</strong> $${item.price.toFixed(2)}</p>
+                            <button onclick="editItem(${item.id})">Edit</button>
+                            <button class="delete" onclick="deleteItem(${item.id})">Delete</button>
+                        `;
+                        itemsList.appendChild(itemDiv);
+                    });
+                }
+            } catch (error) {
+                showStatus(`Error fetching items: ${error.message}`, true);
+            } finally {
+                itemsLoader.style.display = 'none';
+            }
+        }
+
+        // Create new item
+        itemForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            
+            const newItem = {
+                name: document.getElementById('name').value,
+                description: document.getElementById('description').value,
+                price: parseFloat(document.getElementById('price').value),
+                is_active: document.getElementById('is_active').checked
+            };
+            
+            try {
+                const response = await fetch(`${apiBaseUrl}/items/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(newItem)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                
+                const createdItem = await response.json();
+                showStatus(`Item "${createdItem.name}" created successfully!`);
+                itemForm.reset();
+                
+                // Switch to items tab
+                document.querySelector('.tab[data-tab="items"]').click();
+            } catch (error) {
+                showStatus(`Error creating item: ${error.message}`, true);
+            }
+        });
+
+        // Edit item - open edit form
+        function editItem(id) {
+            fetch(`${apiBaseUrl}/items/${id}`)
+                .then(response => response.json())
+                .then(item => {
+                    document.getElementById('edit_id').value = item.id;
+                    document.getElementById('edit_name').value = item.name;
+                    document.getElementById('edit_description').value = item.description || '';
+                    document.getElementById('edit_price').value = item.price;
+                    document.getElementById('edit_is_active').checked = item.is_active;
+                    
+                    editItemForm.style.display = 'block';
+                })
+                .catch(error => showStatus(`Error fetching item: ${error.message}`, true));
+        }
+
+        // Update item
+        updateItemBtn.addEventListener('click', async () => {
+            const id = document.getElementById('edit_id').value;
+            const updatedItem = {
+                name: document.getElementById('edit_name').value,
+                description: document.getElementById('edit_description').value,
+                price: parseFloat(document.getElementById('edit_price').value),
+                is_active: document.getElementById('edit_is_active').checked
+            };
+            
+            try {
+                const response = await fetch(`${apiBaseUrl}/items/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(updatedItem)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                
+                showStatus(`Item updated successfully!`);
+                editItemForm.style.display = 'none';
+                fetchItems();
+            } catch (error) {
+                showStatus(`Error updating item: ${error.message}`, true);
+            }
+        });
+
+        // Delete item
+        function deleteItem(id) {
+            if (confirm('Are you sure you want to delete this item?')) {
+                fetch(`${apiBaseUrl}/items/${id}`, {
+                    method: 'DELETE'
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(() => {
+                    showStatus('Item deleted successfully!');
+                    fetchItems();
+                })
+                .catch(error => showStatus(`Error deleting item: ${error.message}`, true));
+            }
+        }
+
+        // Fetch Redis info
+        function fetchRedisInfo() {
+            redisLoader.style.display = 'block';
+            
+            // Fetch Redis stats
+            fetch(`${apiBaseUrl}/redis/stats`)
+                .then(response => response.json())
+                .then(stats => {
+                    redisStats.innerHTML = `
+                        <p><strong>Memory Used:</strong> ${stats.used_memory}</p>
+                        <p><strong>Connected Clients:</strong> ${stats.clients}</p>
+                        <p><strong>Uptime:</strong> ${formatSeconds(stats.uptime)}</p>
+                    `;
+                })
+                .catch(error => {
+                    redisStats.innerHTML = `<p class="error">Error fetching Redis stats: ${error.message}</p>`;
+                });
+                
+            // Fetch Redis keys
+            fetch(`${apiBaseUrl}/redis/keys`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.keys.length === 0) {
+                        redisKeys.innerHTML = '<p>No keys found in Redis</p>';
+                    } else {
+                        redisKeys.innerHTML = '<ul>' + 
+                            data.keys.map(key => `<li>${key}</li>`).join('') +
+                            '</ul>';
+                    }
+                })
+                .catch(error => {
+                    redisKeys.innerHTML = `<p class="error">Error fetching Redis keys: ${error.message}</p>`;
+                })
+                .finally(() => {
+                    redisLoader.style.display = 'none';
+                });
+        }
+
+        // Get random number from API
+        randomBtn.addEventListener('click', () => {
+            randomResult.textContent = 'Generating...';
+            
+            fetch(`${apiBaseUrl}/random`)
+                .then(response => response.json())
+                .then(data => {
+                    randomResult.textContent = `Random number: ${data.random_number} (Last: ${data.last_random})`;
+                })
+                .catch(error => {
+                    randomResult.textContent = `Error: ${error.message}`;
+                });
+        });
+
+        // Format seconds to days, hours, minutes, seconds
+        function formatSeconds(seconds) {
+            const days = Math.floor(seconds / (24 * 60 * 60));
+            seconds %= (24 * 60 * 60);
+            const hours = Math.floor(seconds / (60 * 60));
+            seconds %= (60 * 60);
+            const minutes = Math.floor(seconds / 60);
+            seconds %= 60;
+            
+            return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+        }
+
+        // Initial load
+        fetchItems();
+    </script>
+</body>
+</html>
